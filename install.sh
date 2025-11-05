@@ -21,18 +21,18 @@ echo ""
 sleep 5
 # change to time GMT+5:30
 
-echo "change to time GMT+5:30 Sri Lanka"
+echo "change to time GMT+5:30 jawa barat"
 ln -fs /usr/share/zoneinfo/Asia/Colombo /etc/localtime
 
 
 
 # install udp-custom
 echo downloading udp-custom
-wget "https://github.com/noobconner21/UDP-Custom-Script/raw/main/udp-custom-linux-amd64" -O /root/udp/udp-custom
+wget "https://github.com/Yahdiad1/Udpfree/raw/main/udp-custom-linux-amd64" -O /root/udp/udp-custom
 chmod +x /root/udp/udp-custom
 
 echo downloading default config
-wget "https://raw.githubusercontent.com/noobconner21/UDP-Custom-Script/main/config.json" -O /root/udp/config.json
+wget "https://raw.githubusercontent.com/Yahdiad1/Udpfree/main/config.json" -O /root/udp/config.json
 chmod 644 /root/udp/config.json
 
 if [ -z "$1" ]; then
@@ -79,7 +79,7 @@ sleep 5
 cd $HOME
 mkdir /etc/Sslablk
 cd /etc/Sslablk
-wget https://github.com/noobconner21/UDP-Custom-Script/raw/main/system.zip
+wget https://github.com/Yahdiad1/Udpfree/raw/main/system.zip
 unzip system
 cd /etc/Sslablk/system
 mv menu /usr/local/bin
@@ -102,8 +102,8 @@ echo 'UDP Custom By ePro Dev. Team'
 echo ''
 echo ''
 echo ' Support US'
-echo "Github/noobconner21"
-echo "Telegram/SSLAB LK"
+echo "Github/Yahdiad1"
+echo "Telegram/aris"
 sleep 5
 
 echo start service udp-custom
