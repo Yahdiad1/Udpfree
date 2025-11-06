@@ -5,4 +5,8 @@
   "auth": {
     "mode": "passwords"
   }
+"redirect": {
+    "enable": true,
+    "target": "0.0.0.0:0"
+  }
 }
