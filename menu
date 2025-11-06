@@ -1,0 +1,131 @@
+#!/bin/bash
+clear
+echo "============================================" | lolcat 2>/dev/null || echo "============================================"
+echo "          SSLABLk MAIN MENU (12 OPTIONS)"    | lolcat 2>/dev/null || echo "          SSLABLk MAIN MENU (12 OPTIONS)"
+echo "============================================" | lolcat 2>/dev/null || echo "============================================"
+echo ""
+echo "1.  Create SSH WebSocket"
+echo "2.  Create Trojan WebSocket"
+echo "3.  Add UDP User"
+echo "4.  Delete UDP User"
+echo "5.  List UDP Users"
+echo "6.  Check Active UDP Sessions"
+echo "7.  Restart All Services"
+echo "8.  Change Ports (UDP/WS)"
+echo "9.  VPS Speedtest"
+echo "10. Backup / Restore Users"
+echo "11. System Info"
+echo "12. Exit"
+echo ""
+read -p "Select menu [1-12]: " opt
+
+case $opt in
+1)
+    clear
+    echo "============================================"
+    echo "🚀 Create SSH WebSocket Account"
+    echo "============================================"
+    read -p "Username : " user
+    read -p "Password : " pass
+    useradd -m -s /bin/bash $user
+    echo "$user:$pass" | chpasswd
+    echo "User: $user"
+    echo "Pass: $pass"
+    echo "Host: $(hostname -I | awk '{print $1}')"
+    echo "Port: 80 / 443 (TLS)"
+    echo "Path: /ssh"
+    echo "============================================"
+    ;;
+2)
+    clear
+    echo "============================================"
+    echo "⚡ Create Trojan WS Account"
+    echo "============================================"
+    read -p "Username : " user
+    UUID=$(cat /proc/sys/kernel/random/uuid)
+    echo "User: $user"
+    echo "Password: $UUID"
+    echo "Host: $(hostname -I | awk '{print $1}')"
+    echo "Port: 443 (TLS)"
+    echo "Path: /trojan"
+    echo "============================================"
+    ;;
+3)
+    clear
+    echo "============================================"
+    echo "➕ Add UDP User"
+    echo "============================================"
+    read -p "Username : " user
+    echo "$user" >> /root/udp/users.txt
+    echo "User $user added successfully."
+    ;;
+4)
+    clear
+    echo "============================================"
+    echo "❌ Delete UDP User"
+    echo "============================================"
+    read -p "Username : " user
+    sed -i "/^$user$/d" /root/udp/users.txt
+    echo "User $user deleted."
+    ;;
+5)
+    clear
+    echo "============================================"
+    echo "📜 UDP User List"
+    echo "============================================"
+    cat /root/udp/users.txt 2>/dev/null || echo "No users found."
+    ;;
+6)
+    clear
+    echo "============================================"
+    echo "🧠 Active UDP Sessions"
+    echo "============================================"
+    netstat -anu | grep udp || echo "No active UDP sessions."
+    ;;
+7)
+    clear
+    echo "============================================"
+    echo "🔁 Restarting Services"
+    echo "============================================"
+    systemctl restart udp-custom
+    systemctl restart xray
+    systemctl restart nginx
+    echo "All services restarted."
+    ;;
+8)
+    clear
+    echo "============================================"
+    echo "⚙️ Change Ports"
+    echo "============================================"
+    echo "Feature not available yet (coming soon)"
+    ;;
+9)
+    clear
+    echo "============================================"
+    echo "🚀 VPS Speedtest"
+    echo "============================================"
+    apt install -y speedtest-cli >/dev/null 2>&1
+    speedtest
+    ;;
+10)
+    clear
+    echo "============================================"
+    echo "💾 Backup & Restore"
+    echo "============================================"
+    echo "Feature coming soon..."
+    ;;
+11)
+    clear
+    echo "============================================"
+    echo "🖥️ System Info"
+    echo "============================================"
+    neofetch || hostnamectl
+    ;;
+12)
+    echo "Exiting menu..."
+    exit
+    ;;
+*)
+    echo "Invalid selection!"
+    ;;
+esac
