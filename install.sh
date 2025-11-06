@@ -15,9 +15,9 @@ clear
 echo -e "          ░█▀▀▀█ ░█▀▀▀█ ░█─── ─█▀▀█ ░█▀▀█   ░█─░█ ░█▀▀▄ ░█▀▀█ " | lolcat
 echo -e "          ─▀▀▀▄▄ ─▀▀▀▄▄ ░█─── ░█▄▄█ ░█▀▀▄   ░█─░█ ░█─░█ ░█▄▄█ " | lolcat
 echo -e "          ░█▄▄▄█ ░█▄▄▄█ ░█▄▄█ ░█─░█ ░█▄▄█   ─▀▄▄▀ ░█▄▄▀ ░█─── " | lolcat
-echo ""
-echo ""
-echo ""
+echo "" UDP CUSTOM
+echo ""UDP FREE NET
+echo "" UDP FOR NET
 sleep 5
 # change to time GMT+5:30
 
@@ -72,9 +72,9 @@ fi
 clear
 echo '    Install Custom UDP Manager   ' | lolcat
 
-echo ''
-echo ''
-echo ''
+echo '' Suport me
+echo ''like for me
+echo ''buy from me
 sleep 5
 cd $HOME
 mkdir /etc/Sslablk
@@ -99,8 +99,8 @@ rm system.zip
 clear
 echo 'UDP Install Script By Project SSLAB LK Dev.Team'
 echo 'UDP Custom By ePro Dev. Team'
-echo ''
-echo ''
+echo 'Udp free
+echo 'Udp prem
 echo ' Support US'
 echo "Github/Yahdiad1"
 echo "Telegram/aris"
