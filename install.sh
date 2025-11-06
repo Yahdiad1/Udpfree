@@ -1,108 +1,21 @@
 #!/bin/bash
-# ============================================
-# SSLABLk Multi Service Installer - Debian 10
-# UDP Custom, SSH WS, Trojan WS, IP Limit Manual
-# ============================================
-
-clear
-echo "============================================"
-echo "🚀 Starting SSLABLk Multi Service Installer"
-echo "============================================"
-sleep 2
-
-# --- Update & Dependencies ---
-apt update -y && apt upgrade -y
-apt install -y wget curl unzip ufw net-tools iproute2 cron lolcat figlet neofetch speedtest-cli nginx python3 socat jq iptables-persistent
-
-# --- Timezone ---
-ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-
-# --- Directories ---
-mkdir -p /root/udp
-mkdir -p /etc/Sslablk
-cd /root/udp
-
-# --- Download UDP Custom Binary ---
-wget -q -O udp-custom "https://github.com/Yahdiad1/Udpfree/raw/main/udp-custom-linux-amd64"
-chmod +x udp-custom
-
-# --- Default Config UDP (port 7300) ---
-cat <<EOF >/root/udp/config.json
-{
-  "listen": ":7300",
-  "stream_buffer": 33554432,
-  "receive_buffer": 83886080,
-  "auth": {
-    "mode": "passwords",
-    "passwords": ["123456","udp2025"]
-  },
-  "udp_timeout": 60
-}
-EOF
-
-# --- UDP Custom Service ---
-cat <<EOF >/etc/systemd/system/udp-custom.service
-[Unit]
-Description=UDP Custom Service
-After=network.target
-
-[Service]
-User=root
-Type=simple
-ExecStart=/root/udp/udp-custom server
-WorkingDirectory=/root/udp/
-Restart=always
-RestartSec=3s
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable udp-custom
-systemctl restart udp-custom
-
-# --- Firewall ---
-ufw allow 22,80,443/tcp >/dev/null 2>&1
-ufw allow 1:65535/udp >/dev/null 2>&1
-ufw --force enable >/dev/null 2>&1
-iptables -I INPUT -p udp --dport 7300 -j ACCEPT
-iptables-save >/etc/iptables.up.rules
-
-# --- Default IP Limit Values ---
-TCP_CONN_LIMIT_WS=10
-TCP_CONN_LIMIT_SSH=5
-UDP_PKT_LIMIT=20
-UDP_BURST=40
-
-# --- Expired User Checker ---
-cat <<'EOF' >/usr/local/bin/expire_check
-#!/bin/bash
-TODAY=$(date +%Y-%m-%d)
+# =============================================
+# SSLABLk VPS Full Menu v1.0
+# Debian 10
+# =============================================
+UDPDIR="/root/udp"
+USERFILE="$UDPDIR/users.txt"
 EXPIRE_FILE="/etc/expire_users.txt"
-USERFILE="/root/udp/users.txt"
-mkdir -p /root/udp
-touch $EXPIRE_FILE $USERFILE
-while read user exp; do
-  if [[ "$exp" < "$TODAY" ]]; then
-    userdel -r $user 2>/dev/null
-    sed -i "/^$user /d" $EXPIRE_FILE
-    sed -i "/^$user:/d" $USERFILE
-    echo "Deleted expired user: $user"
-  fi
-done < $EXPIRE_FILE
-EOF
-chmod +x /usr/local/bin/expire_check
-(crontab -l 2>/dev/null; echo "0 0 * * * /usr/local/bin/expire_check >/dev/null 2>&1") | crontab -
+LIMIT_FILE="/etc/Sslablk/limits.txt"
+TROJAN_FILE="/etc/trojan_users.txt"
 
-# --- Menu Script ---
-cat <<'EOF' >/usr/local/bin/menu
-#!/bin/bash
+mkdir -p $UDPDIR /etc/Sslablk
+
+while true; do
 clear
-echo "============================================" | lolcat 2>/dev/null || echo "============================================"
-echo "         SSLABLk VPS MANAGER v2.1"          | lolcat 2>/dev/null || echo "         SSLABLk VPS MANAGER v2.1"
-echo "============================================" | lolcat 2>/dev/null || echo "============================================"
-echo ""
+echo "============================================"
+echo "         SSLABLk VPS Manager Full"
+echo "============================================"
 echo "1.  Create SSH WebSocket"
 echo "2.  Create Trojan WebSocket"
 echo "3.  Create UDP User"
@@ -119,53 +32,175 @@ echo "13. Set IP Limit Manual"
 echo ""
 read -p "Select menu [1-13]: " opt
 
-UDPDIR="/root/udp"
-USERFILE="$UDPDIR/users.txt"
-EXPIRE_FILE="/etc/expire_users.txt"
-LIMIT_FILE="/etc/Sslablk/limits.txt"
-mkdir -p $UDPDIR /etc/Sslablk
-
 case $opt in
 1)
-  # SSH WS create
   clear
-  echo "🚀 Create SSH WebSocket Account"
-  read -p "Username : " user
-  read -s -p "Password : " pass; echo
-  read -p "Active days : " days
+  echo "== Create SSH WebSocket =="
+  read -p "Username: " user
+  read -s -p "Password: " pass; echo
+  read -p "Active days: " days
   useradd -e $(date -d "$days days" +"%Y-%m-%d") -m -s /bin/bash "$user" 2>/dev/null || true
-  echo "${user}:${pass}" | chpasswd 2>/dev/null || true
+  echo "${user}:${pass}" | chpasswd 2>/dev/null
   exp=$(date -d "$days days" +"%Y-%m-%d")
   echo "$user $exp" >> $EXPIRE_FILE
-
   read -p "Add IP limit? (y/N): " want_limit
   if [[ "$want_limit" =~ ^[Yy]$ ]]; then
-    read -p "Source IP (leave empty = all IPs): " srcip
-    read -p "Max TCP conn per IP WS (80/443) [default 10]: " max_tcp
+    read -p "Source IP (empty=all): " srcip
+    read -p "Max TCP connections (80/443, default 10): " max_tcp
     max_tcp=${max_tcp:-10}
     if [[ -n "$srcip" ]]; then
-      iptables -I INPUT -p tcp -s "$srcip" --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT --reject-with tcp-reset
-      iptables -I INPUT -p tcp -s "$srcip" --dport 80 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT --reject-with tcp-reset
-      tcp_rule="tcp-src:${srcip}-dport:80,443-max:${max_tcp}"
+      iptables -I INPUT -p tcp -s "$srcip" --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+      iptables -I INPUT -p tcp -s "$srcip" --dport 80 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
     else
-      iptables -I INPUT -p tcp --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT --reject-with tcp-reset
-      iptables -I INPUT -p tcp --dport 80 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT --reject-with tcp-reset
-      tcp_rule="tcp-all-dport:80,443-max:${max_tcp}"
+      iptables -I INPUT -p tcp --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+      iptables -I INPUT -p tcp --dport 80 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
     fi
-    echo "$user|$tcp_rule|" >> $LIMIT_FILE
+    echo "$user|tcp-src:$srcip-max:$max_tcp" >> $LIMIT_FILE
+  fi
+  iptables-save >/etc/iptables.up.rules
+  echo "✅ SSH WS created: $user (exp: $exp)"
+  read -p "ENTER to continue..."
+;;
+2)
+  clear
+  echo "== Create Trojan WebSocket =="
+  read -p "Label (username): " user
+  read -p "Active days: " days
+  uuid=$(cat /proc/sys/kernel/random/uuid)
+  exp=$(date -d "$days days" +"%Y-%m-%d")
+  echo "$user $uuid $exp" >> $TROJAN_FILE
+  echo "$user $exp" >> $EXPIRE_FILE
+  read -p "Add IP limit? (y/N): " want_limit
+  if [[ "$want_limit" =~ ^[Yy]$ ]]; then
+    read -p "Source IP (empty=all): " srcip
+    read -p "Max TCP connections (443, default 5): " max_tcp
+    max_tcp=${max_tcp:-5}
+    if [[ -n "$srcip" ]]; then
+      iptables -I INPUT -p tcp -s "$srcip" --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+    else
+      iptables -I INPUT -p tcp --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+    fi
+    echo "$user|tcp-src:$srcip-max:$max_tcp" >> $LIMIT_FILE
+  fi
+  iptables-save >/etc/iptables.up.rules
+  echo "✅ Trojan WS created: $user (UUID:$uuid, exp:$exp)"
+  read -p "ENTER to continue..."
+;;
+3)
+  clear
+  echo "== Create UDP User =="
+  read -p "Username: " user
+  read -s -p "Password: " pass; echo
+  read -p "Active days: " days
+  exp=$(date -d "$days days" +"%Y-%m-%d")
+  echo "$user:$pass:$exp" >> $USERFILE
+  echo "$user $exp" >> $EXPIRE_FILE
+  read -p "Add IP limit? (y/N): " want_limit
+  if [[ "$want_limit" =~ ^[Yy]$ ]]; then
+    read -p "Source IP (empty=all): " srcip
+    read -p "Max UDP packets/sec (7300, default 20): " max_udp
+    max_udp=${max_udp:-20}
+    read -p "UDP burst (default 40): " udp_burst
+    udp_burst=${udp_burst:-40}
+    if [[ -n "$srcip" ]]; then
+      iptables -I INPUT -p udp -s "$srcip" --dport 7300 -m hashlimit --hashlimit-above "${max_udp}/second" --hashlimit-burst "$udp_burst" --hashlimit-mode srcip --hashlimit-name "udp_${user}" -j DROP
+    else
+      iptables -I INPUT -p udp --dport 7300 -m hashlimit --hashlimit-above "${max_udp}/second" --hashlimit-burst "$udp_burst" --hashlimit-mode srcip --hashlimit-name "udp_${user}" -j DROP
+    fi
+    echo "$user|udp-src:$srcip-max:$max_udp-burst:$udp_burst" >> $LIMIT_FILE
     iptables-save >/etc/iptables.up.rules
   fi
-  echo "✅ SSH-WS created: $user (exp: $exp)"
+  echo "✅ UDP user $user created (exp:$exp)"
   read -p "ENTER to continue..."
-  exec /usr/local/bin/menu
-  ;;
-# Options 2-13 akan sama seperti sebelumnya dengan IP limit manual, UDP user, Trojan user
-EOF
+;;
+4)
+  clear
+  read -p "Username to delete: " user
+  sed -i "/^$user:/d" $USERFILE 2>/dev/null
+  sed -i "/^$user /d" $TROJAN_FILE 2>/dev/null
+  sed -i "/^$user /d" $EXPIRE_FILE 2>/dev/null
+  if id "$user" >/dev/null 2>&1; then userdel -r "$user" 2>/dev/null || true; fi
+  # Remove IP limits
+  if [ -f $LIMIT_FILE ]; then
+    sed -i "/^$user|/d" $LIMIT_FILE
+    iptables-save >/etc/iptables.up.rules
+  fi
+  echo "✅ User $user deleted"
+  read -p "ENTER to continue..."
+;;
+5)
+  clear
+  echo "== List UDP Users =="
+  cat $USERFILE
+  read -p "ENTER to continue..."
+;;
+6)
+  clear
+  echo "== Active UDP Sessions =="
+  netstat -anu | grep 7300 || echo "No UDP session active"
+  read -p "ENTER to continue..."
+;;
+7)
+  systemctl restart udp-custom
+  echo "✅ Services restarted"
+  read -p "ENTER to continue..."
+;;
+8)
+  clear
+  echo "⚙️ Change Ports (manual edit config.json)"
+  read -p "ENTER to continue..."
+;;
+9)
+  clear
+  speedtest-cli
+  read -p "ENTER to continue..."
+;;
+10)
+  clear
+  echo "⚠️ Backup / Restore not implemented"
+  read -p "ENTER to continue..."
+;;
+11)
+  clear
+  neofetch
+  read -p "ENTER to continue..."
+;;
+12)
+  exit
+;;
+13)
+  clear
+  read -p "Username: " user
+  read -p "Source IP (empty=all): " srcip
+  read -p "Max TCP (leave empty to skip): " max_tcp
+  read -p "Max UDP (leave empty to skip): " max_udp
+  read -p "UDP burst (default 40): " udp_burst
+  udp_burst=${udp_burst:-40}
 
-chmod +x /usr/local/bin/menu
+  if [[ -n "$max_tcp" ]]; then
+    if [[ -n "$srcip" ]]; then
+      iptables -I INPUT -p tcp -s "$srcip" --dport 80 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+      iptables -I INPUT -p tcp -s "$srcip" --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+    else
+      iptables -I INPUT -p tcp --dport 80 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+      iptables -I INPUT -p tcp --dport 443 -m connlimit --connlimit-above "$max_tcp" --connlimit-mask 32 -j REJECT
+    fi
+  fi
 
-# --- Auto Reboot After Installation ---
-echo "============================================"
-echo "✅ Installation complete. VPS will reboot in 15s..."
-sleep 15
-reboot
+  if [[ -n "$max_udp" ]]; then
+    if [[ -n "$srcip" ]]; then
+      iptables -I INPUT -p udp -s "$srcip" --dport 7300 -m hashlimit --hashlimit-above "${max_udp}/second" --hashlimit-burst "$udp_burst" --hashlimit-mode srcip --hashlimit-name "udp_${user}" -j DROP
+    else
+      iptables -I INPUT -p udp --dport 7300 -m hashlimit --hashlimit-above "${max_udp}/second" --hashlimit-burst "$udp_burst" --hashlimit-mode srcip --hashlimit-name "udp_${user}" -j DROP
+    fi
+    iptables-save >/etc/iptables.up.rules
+  fi
+  echo "✅ IP limit set for $user"
+  read -p "ENTER to continue..."
+;;
+*)
+  echo "Invalid option"
+  sleep 1
+;;
+esac
+done
