@@ -1,12 +1,13 @@
 #!/bin/bash
+# SSLABLk Multi Service Menu v2
 clear
 echo "============================================" | lolcat 2>/dev/null || echo "============================================"
-echo "          SSLABLk MAIN MENU (12 OPTIONS)"    | lolcat 2>/dev/null || echo "          SSLABLk MAIN MENU (12 OPTIONS)"
+echo "         SSLABLk VPS MANAGER v2.0"            | lolcat 2>/dev/null || echo "         SSLABLk VPS MANAGER v2.0"
 echo "============================================" | lolcat 2>/dev/null || echo "============================================"
 echo ""
 echo "1.  Create SSH WebSocket"
 echo "2.  Create Trojan WebSocket"
-echo "3.  Add UDP User"
+echo "3.  Create UDP User"
 echo "4.  Delete UDP User"
 echo "5.  List UDP Users"
 echo "6.  Check Active UDP Sessions"
@@ -19,6 +20,13 @@ echo "12. Exit"
 echo ""
 read -p "Select menu [1-12]: " opt
 
+# Path data
+UDPDIR="/root/udp"
+USERFILE="$UDPDIR/users.txt"
+EXPIRE_FILE="/etc/expire_users.txt"
+
+mkdir -p $UDPDIR
+
 case $opt in
 1)
     clear
@@ -27,14 +35,20 @@ case $opt in
     echo "============================================"
     read -p "Username : " user
     read -p "Password : " pass
-    useradd -m -s /bin/bash $user
+    read -p "Active days : " days
+    useradd -e $(date -d "$days days" +"%Y-%m-%d") -m -s /bin/bash $user >/dev/null 2>&1
     echo "$user:$pass" | chpasswd
-    echo "User: $user"
-    echo "Pass: $pass"
-    echo "Host: $(hostname -I | awk '{print $1}')"
-    echo "Port: 80 / 443 (TLS)"
-    echo "Path: /ssh"
-    echo "============================================"
+    expire_date=$(date -d "$days days" +"%Y-%m-%d")
+    echo "$user $expire_date" >> $EXPIRE_FILE
+    echo "--------------------------------------------"
+    echo "✅ SSH WebSocket Account Created"
+    echo "User     : $user"
+    echo "Password : $pass"
+    echo "Expires  : $expire_date"
+    echo "Host     : $(hostname -I | awk '{print $1}')"
+    echo "Port     : 80 / 443 (TLS)"
+    echo "Path     : /ssh"
+    echo "--------------------------------------------"
     ;;
 2)
     clear
@@ -42,22 +56,37 @@ case $opt in
     echo "⚡ Create Trojan WS Account"
     echo "============================================"
     read -p "Username : " user
+    read -p "Active days : " days
     UUID=$(cat /proc/sys/kernel/random/uuid)
-    echo "User: $user"
-    echo "Password: $UUID"
-    echo "Host: $(hostname -I | awk '{print $1}')"
-    echo "Port: 443 (TLS)"
-    echo "Path: /trojan"
-    echo "============================================"
+    expire_date=$(date -d "$days days" +"%Y-%m-%d")
+    echo "$user $UUID $expire_date" >> /etc/trojan_users.txt
+    echo "--------------------------------------------"
+    echo "✅ Trojan WS Account Created"
+    echo "User     : $user"
+    echo "Password : $UUID"
+    echo "Expires  : $expire_date"
+    echo "Host     : $(hostname -I | awk '{print $1}')"
+    echo "Port     : 443 (TLS)"
+    echo "Path     : /trojan"
+    echo "--------------------------------------------"
     ;;
 3)
     clear
     echo "============================================"
-    echo "➕ Add UDP User"
+    echo "➕ Create UDP User"
     echo "============================================"
     read -p "Username : " user
-    echo "$user" >> /root/udp/users.txt
-    echo "User $user added successfully."
+    read -p "Password : " pass
+    read -p "Active days : " days
+    expire_date=$(date -d "$days days" +"%Y-%m-%d")
+    echo "$user:$pass:$expire_date" >> $USERFILE
+    echo "$user $expire_date" >> $EXPIRE_FILE
+    echo "--------------------------------------------"
+    echo "✅ UDP User Added"
+    echo "User     : $user"
+    echo "Password : $pass"
+    echo "Expires  : $expire_date"
+    echo "--------------------------------------------"
     ;;
 4)
     clear
@@ -65,15 +94,20 @@ case $opt in
     echo "❌ Delete UDP User"
     echo "============================================"
     read -p "Username : " user
-    sed -i "/^$user$/d" /root/udp/users.txt
-    echo "User $user deleted."
+    sed -i "/^$user:/d" $USERFILE
+    sed -i "/^$user /d" $EXPIRE_FILE
+    echo "User $user deleted successfully."
     ;;
 5)
     clear
     echo "============================================"
     echo "📜 UDP User List"
     echo "============================================"
-    cat /root/udp/users.txt 2>/dev/null || echo "No users found."
+    if [ -f $USERFILE ]; then
+        column -t -s ":" $USERFILE
+    else
+        echo "No users found."
+    fi
     ;;
 6)
     clear
@@ -87,17 +121,17 @@ case $opt in
     echo "============================================"
     echo "🔁 Restarting Services"
     echo "============================================"
-    systemctl restart udp-custom
-    systemctl restart xray
-    systemctl restart nginx
-    echo "All services restarted."
+    systemctl restart udp-custom 2>/dev/null
+    systemctl restart xray 2>/dev/null
+    systemctl restart nginx 2>/dev/null
+    echo "All services restarted successfully."
     ;;
 8)
     clear
     echo "============================================"
     echo "⚙️ Change Ports"
     echo "============================================"
-    echo "Feature not available yet (coming soon)"
+    echo "Feature coming soon..."
     ;;
 9)
     clear
