@@ -1,53 +1,36 @@
 #!/bin/bash
 # ============================================
-# UDP Custom Installer by Yahdiad1 / SSLABLk
-# Fixed & Improved by Yhds
+# SSLABLk Installer (UDP + SSH-WS + Trojan-WS)
+# For Debian 10 by Yhds
 # ============================================
-echo "============================================"
-echo "🚀 Starting UDP Custom Installer..."
-echo "============================================"
-sleep 2
 
-# Update & Install Dependensi
-apt update -y && apt upgrade -y
-apt install -y wget curl unzip ufw net-tools iproute2 cron
-
-# Create Main Directory
-mkdir -p /root/udp
-cd /root/udp
-
-# ============================================
-# Banner
-# ============================================
 clear
 echo "============================================"
-echo "         UDP CUSTOM INSTALLER"
-echo "============================================"
-echo " UDP Free Net | UDP For VPN | SSLABLk"
+echo "🚀 Starting SSLABLk Installer (UDP + WS)"
 echo "============================================"
 sleep 2
 
-# ============================================
-# Set Timezone
-# ============================================
-echo "[*] Setting timezone to Asia/Jakarta..."
+# Update & Upgrade
+apt update -y && apt upgrade -y
+apt install -y wget curl unzip socat cron net-tools nginx iptables iproute2 ufw
+
+# Set timezone
 ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 
+# Create main directory
+mkdir -p /etc/Sslablk/system
+mkdir -p /root/udp
+mkdir -p /usr/local/etc/xray
+
 # ============================================
-# Install UDP Custom Binary
+# Install UDP Custom
 # ============================================
-echo "[*] Downloading UDP Custom binary..."
+echo "[*] Installing UDP Custom..."
 wget -q -O /root/udp/udp-custom "https://github.com/Yahdiad1/Udpfree/raw/main/udp-custom-linux-amd64"
 chmod +x /root/udp/udp-custom
-
-echo "[*] Downloading default config..."
 wget -q -O /root/udp/config.json "https://raw.githubusercontent.com/Yahdiad1/Udpfree/main/config.json"
-chmod 644 /root/udp/config.json
 
-# ============================================
-# Create systemd Service
-# ============================================
-cat <<EOF > /etc/systemd/system/udp-custom.service
+cat <<EOF >/etc/systemd/system/udp-custom.service
 [Unit]
 Description=UDP Custom Service
 After=network.target
@@ -58,72 +41,127 @@ Type=simple
 ExecStart=/root/udp/udp-custom server
 WorkingDirectory=/root/udp/
 Restart=always
-RestartSec=3s
+RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-# ============================================
-# Firewall & Port Setup
-# ============================================
-echo "[*] Opening all UDP ports (1–65535)..."
-ufw allow 1:65535/udp >/dev/null 2>&1
-ufw allow 22/tcp >/dev/null 2>&1
-ufw --force enable >/dev/null 2>&1
-
-iptables -I INPUT -p udp --dport 1:65535 -j ACCEPT
-iptables -I INPUT -p tcp --dport 22 -j ACCEPT
-iptables-save > /etc/iptables.up.rules
-
-# ============================================
-# Start UDP Custom Service
-# ============================================
-echo "[*] Starting UDP Custom service..."
 systemctl daemon-reload
 systemctl enable udp-custom
 systemctl restart udp-custom
 
 # ============================================
-# Auto Restart + Auto Reboot Cron
+# Firewall
 # ============================================
-echo "[*] Setting up cron jobs..."
+ufw allow 22/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 1:65535/udp
+ufw --force enable
+iptables -I INPUT -p udp --dport 1:65535 -j ACCEPT
+iptables-save > /etc/iptables.up.rules
+
+# ============================================
+# Install Xray Core (for WS + TLS)
+# ============================================
+echo "[*] Installing Xray..."
+bash <(curl -fsSL https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh)
+
+# Create random domain via sslip.io
+IP=$(hostname -I | awk '{print $1}')
+DOMAIN="${IP//./-}.sslip.io"
+
+# Generate self-signed certificate
+mkdir -p /etc/xray
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/xray/private.key -out /etc/xray/cert.crt \
+  -subj "/CN=$DOMAIN"
+
+# ============================================
+# Xray Config (SSH WS + Trojan WS)
+# ============================================
+UUID=$(cat /proc/sys/kernel/random/uuid)
+cat <<EOF >/usr/local/etc/xray/config.json
+{
+  "inbounds": [
+    {
+      "port": 80,
+      "protocol": "vless",
+      "settings": { "clients": [{ "id": "$UUID", "level": 0 }] },
+      "streamSettings": { "network": "ws", "wsSettings": { "path": "/ssh" } }
+    },
+    {
+      "port": 443,
+      "protocol": "trojan",
+      "settings": { "clients": [{ "password": "$UUID" }] },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": { "certificates": [{ "certificateFile": "/etc/xray/cert.crt", "keyFile": "/etc/xray/private.key" }] },
+        "wsSettings": { "path": "/trojan" }
+      }
+    }
+  ],
+  "outbounds": [{ "protocol": "freedom" }]
+}
+EOF
+
+systemctl enable xray
+systemctl restart xray
+
+# ============================================
+# Nginx Config for WebSocket
+# ============================================
+cat <<EOF >/etc/nginx/sites-available/default
+server {
+    listen 80;
+    server_name $DOMAIN;
+    location /ssh {
+        proxy_redirect off;
+        proxy_pass http://127.0.0.1:80;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+    }
+}
+EOF
+
+systemctl restart nginx
+
+# ============================================
+# Auto Restart + Auto Reboot
+# ============================================
 (crontab -l 2>/dev/null; echo "*/5 * * * * systemctl restart udp-custom >/dev/null 2>&1") | crontab -
 (crontab -l 2>/dev/null; echo "0 5 * * * /sbin/reboot >/dev/null 2>&1") | crontab -
-
 service cron restart
 
 # ============================================
-# Display Info
+# Install Menu
+# ============================================
+wget -q -O /usr/local/bin/menu "https://raw.githubusercontent.com/Yahdiad1/Udpfree/main/menu"
+chmod +x /usr/local/bin/menu
+ln -sf /usr/local/bin/menu /bin/menu
+
+# ============================================
+# Final Info
 # ============================================
 clear
-IP=$(hostname -I | awk '{print $1}')
-STATUS=$(systemctl is-active udp-custom)
-
 echo "============================================"
-echo "✅ UDP Custom Installed Successfully!"
+echo "✅ Install Success (Debian 10)"
 echo "============================================"
-echo "Service Name : udp-custom"
-echo "Status       : $STATUS"
-echo "VPS IP       : $IP"
-echo "Ports Open   : UDP 1–65535"
+echo "UDP Port     : 1–65535"
+echo "SSH WS Path  : /ssh"
+echo "Trojan WS    : /trojan"
+echo "Domain       : $DOMAIN"
+echo "UUID         : $UUID"
 echo "Binary Path  : /root/udp/udp-custom"
 echo "Config Path  : /root/udp/config.json"
-echo "Auto Restart : Every 5 minutes"
-echo "Auto Reboot  : 05:00 AM Daily"
-echo "============================================"
-echo "GitHub  : Yahdiad1"
-echo "Telegram: @aris"
+echo "Menu Command : menu"
 echo "============================================"
 
 echo ""
-echo "[*] Checking UDP Listening Ports..."
-sleep 2
-netstat -anu | grep -E 'udp' || echo "⚠️ No UDP process found (wait a few seconds or check config)."
-
-echo ""
-echo "Installation complete! Reboot recommended."
-echo "To check service: systemctl status udp-custom"
-echo "============================================"
-echo reboot
+echo "✅ Instalasi selesai! VPS akan reboot otomatis dalam 5 detik..."
+sleep 5
 reboot
